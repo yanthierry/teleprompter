@@ -1,0 +1,40 @@
+name: Publicar versão web
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Organizar arquivos
+        run: |
+          if [ ! -d www ]; then
+            mkdir -p www/vendor assets
+            mv index.html sw.js manifest.webmanifest icon-192.png icon-512.png www/
+            mv peerjs.min.js jsQR.js qrcode.js www/vendor/
+            mv icon.png assets/
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+      - id: deployment
+        uses: actions/deploy-pages@v4
