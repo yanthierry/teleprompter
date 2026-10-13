@@ -1,0 +1,61 @@
+name: Gerar APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Organizar arquivos
+        run: |
+          if [ ! -d www ]; then
+            mkdir -p www/vendor assets
+            mv index.html sw.js manifest.webmanifest icon-192.png icon-512.png www/
+            mv peerjs.min.js jsQR.js qrcode.js www/vendor/
+            mv icon.png assets/
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Criar projeto Android
+        run: npx cap add android
+
+      - name: Permissão de câmera
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n    <application#' "$MANIFEST"
+
+      - name: Ícone do app
+        continue-on-error: true
+        run: npx --yes @capacitor/assets generate --android
+
+      - name: Sincronizar arquivos web
+        run: npx cap sync android
+
+      - name: Compilar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: teleprompter-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
